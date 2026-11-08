@@ -1,0 +1,22 @@
+# OCI install retried (first attempt stalled during chart download)
+
+$ helm install my-podinfo oci://ghcr.io/stefanprodan/charts/podinfo --version 6.15.0 -n dso202-helm --set replicaCount=2 --wait --timeout 3m
+Pulled: ghcr.io/stefanprodan/charts/podinfo:6.15.0
+Digest: sha256:ff3d3e14728f75476ed4d43c14f80d52d81d36bc16906843463d464c6146f0d8
+NAME: my-podinfo
+LAST DEPLOYED: Sun Nov  8 22:13:30 2026
+NAMESPACE: dso202-helm
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+NOTES:
+1. Get the application URL by running these commands:
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl -n dso202-helm port-forward deploy/my-podinfo 8080:9898
+
+$ helm list -n dso202-helm
+NAME      	NAMESPACE  	REVISION	UPDATED                             	STATUS  	CHART         	APP VERSION
+my-podinfo	dso202-helm	1       	2026-11-08 22:13:30.560733 +0600 +06	deployed	podinfo-6.15.0	6.15.0     
+
+$ helm uninstall my-podinfo -n dso202-helm --wait
+release "my-podinfo" uninstalled

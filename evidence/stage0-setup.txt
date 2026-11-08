@@ -1,0 +1,24 @@
+$ grep -rs baltocdn /etc/apt/...
+no baltocdn source (macOS, Helm installed via Homebrew)
+
+$ helm version
+version.BuildInfo{Version:"v4.3.1", GitCommit:"c0d08d0d6d9424d4a14febb5e8a3e51b0dd00dff", GitTreeState:"dirty", GoVersion:"go1.27.2", KubeClientVersion:"v1.37"}
+
+$ kubectl config current-context
+kind-dso202
+
+$ kubectl get nodes
+NAME                   STATUS   ROLES           AGE     VERSION
+dso202-control-plane   Ready    control-plane   5d13h   v1.36.1
+dso202-worker          Ready    <none>          5d13h   v1.36.1
+dso202-worker2         Ready    <none>          5d13h   v1.36.1
+
+$ helm env | grep ...
+HELM_MAX_HISTORY="10"
+HELM_NAMESPACE="default"
+HELM_REGISTRY_CONFIG="/Users/tsheringwangpodorji/Library/Preferences/helm/registry/config.json"
+HELM_REPOSITORY_CACHE="/Users/tsheringwangpodorji/Library/Caches/helm/repository"
+HELM_REPOSITORY_CONFIG="/Users/tsheringwangpodorji/Library/Preferences/helm/repositories.yaml"
+
+$ helm list -A
+NAME	NAMESPACE	REVISION	UPDATED	STATUS	CHART	APP VERSION

@@ -1,0 +1,152 @@
+# Failure 1 - missing required value
+
+$ helm template webapp-dev ./webapp
+Error: execution error at (webapp/templates/tests/test-connection.yaml:10:8): page.environment must be set (dev, staging or prod)
+
+Use --debug flag to render out invalid YAML
+
+$ helm lint ./webapp; echo "exit code: $?"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+==> Linting ./webapp
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+exit code: 0
+
+$ helm lint --strict ./webapp; echo "exit code: $?"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+level=WARN msg="missing required values" message="page.environment must be set (dev, staging or prod)"
+==> Linting ./webapp
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+exit code: 0
+
+# Failure 2 - indentation (toYaml without nindent, in a scratch copy of the chart)
+47:          resources:
+48-              {{ toYaml .Values.resources }}
+
+$ helm template webapp-dev /tmp/broken/webapp -f environments/dev.yaml
+Error: YAML parse error on webapp/templates/deployment.yaml: error converting YAML to JSON: yaml: line 59: mapping values are not allowed in this context
+
+Use --debug flag to render out invalid YAML
+
+$ helm template webapp-dev /tmp/broken/webapp -f environments/dev.yaml --debug 2>/dev/null | sed -n '/^ *resources:/,/volumeMounts/p'
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 50m
+          memory: 32Mi
+
+---
+# Source: webapp/templates/service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-dev
+  labels:
+    helm.sh/chart: webapp-0.1.0
+    app.kubernetes.io/name: webapp
+    app.kubernetes.io/instance: webapp-dev
+    app.kubernetes.io/version: "1.30-alpine"
+    app.kubernetes.io/managed-by: Helm
+    dso202/environment: "dev"
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: webapp
+    app.kubernetes.io/instance: webapp-dev
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+      nodePort: 30080
+
+---
+# Source: webapp/templates/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-dev
+  labels:
+    helm.sh/chart: webapp-0.1.0
+    app.kubernetes.io/name: webapp
+    app.kubernetes.io/instance: webapp-dev
+    app.kubernetes.io/version: "1.30-alpine"
+    app.kubernetes.io/managed-by: Helm
+    dso202/environment: "dev"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webapp
+      app.kubernetes.io/instance: webapp-dev
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webapp-0.1.0
+        app.kubernetes.io/name: webapp
+        app.kubernetes.io/instance: webapp-dev
+        app.kubernetes.io/version: "1.30-alpine"
+        app.kubernetes.io/managed-by: Helm
+        dso202/environment: "dev"
+      annotations:
+        # A hash of the rendered ConfigMap. When the page content changes, the
+        # hash changes, the Pod template changes, and the Deployment rolls
+        # out new Pods. Without it, a ConfigMap change never restarts Pods.
+        checksum/config: fc438a467764cbc8b647b97384ffe15cc9c678e3597bd4c3a6fd7e4f17513b5f
+    spec:
+      containers:
+        - name: nginx
+          image: "nginx:1.30-alpine"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+              limits:
+  cpu: 200m
+  memory: 64Mi
+requests:
+  cpu: 50m
+  memory: 32Mi
+          volumeMounts:
+
+# Failure 3 - a number where a string was meant (no schema yet)
+
+$ helm template webapp-dev ./webapp -f environments/dev.yaml -f /tmp/tag-float.yaml | grep 'image: "nginx'
+          image: "nginx:1.3"

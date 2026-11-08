@@ -1,0 +1,41 @@
+# Failure 4 - misspelled Kubernetes field (replica: instead of replicas:)
+11:  replica: {{ .Values.replicaCount }}
+
+$ helm lint /tmp/broken4/webapp -f environments/prod.yaml | tail -1
+1 chart(s) linted, 0 chart(s) failed
+
+$ helm install webapp-prod /tmp/broken4/webapp -f environments/prod.yaml -n dso202-prod --dry-run=server | head -7
+NAME: webapp-prod
+LAST DEPLOYED: Sun Nov  8 22:14:10 2026
+NAMESPACE: dso202-prod
+STATUS: pending-install
+REVISION: 1
+DESCRIPTION: Dry run complete
+HOOKS:
+
+$ helm template webapp-prod /tmp/broken4/webapp -f environments/prod.yaml -n dso202-prod --skip-tests | kubectl apply --dry-run=server -n dso202-prod -f -
+configmap/webapp-prod created (server dry run)
+service/webapp-prod created (server dry run)
+Error from server (BadRequest): error when creating "STDIN": Deployment in version "v1" cannot be handled as a Deployment: strict decoding error: unknown field "spec.replica"
+
+# Step 5 - corrected chart passes for every environment
+
+$ for env in dev prod; do helm lint ./webapp -f environments/$env.yaml && helm template webapp-$env ./webapp -f environments/$env.yaml > /dev/null && echo "$env: ok"; done
+==> Linting ./webapp
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+dev: ok
+==> Linting ./webapp
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+prod: ok
+
+$ for env in dev prod; do helm template webapp-$env ./webapp -f environments/$env.yaml -n dso202-$env --skip-tests | kubectl apply --dry-run=server -n dso202-$env -f -; done
+configmap/webapp-dev created (server dry run)
+service/webapp-dev created (server dry run)
+deployment.apps/webapp-dev created (server dry run)
+configmap/webapp-prod created (server dry run)
+service/webapp-prod created (server dry run)
+deployment.apps/webapp-prod created (server dry run)

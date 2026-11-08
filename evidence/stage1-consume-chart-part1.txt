@@ -1,0 +1,79 @@
+
+$ helm repo add podinfo https://stefanprodan.github.io/podinfo
+"podinfo" has been added to your repositories
+
+$ helm repo update
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "podinfo" chart repository
+...Successfully got an update from the "hashicorp" chart repository
+...Successfully got an update from the "kong" chart repository
+Update Complete. ⎈Happy Helming!⎈
+
+$ helm search repo podinfo
+NAME           	CHART VERSION	APP VERSION	DESCRIPTION                      
+podinfo/podinfo	6.17.0       	6.17.0     	Podinfo Helm chart for Kubernetes
+
+$ helm search repo podinfo --versions | head -4
+NAME           	CHART VERSION	APP VERSION	DESCRIPTION                      
+podinfo/podinfo	6.17.0       	6.17.0     	Podinfo Helm chart for Kubernetes
+podinfo/podinfo	6.16.0       	6.16.0     	Podinfo Helm chart for Kubernetes
+podinfo/podinfo	6.15.0       	6.15.0     	Podinfo Helm chart for Kubernetes
+
+$ helm show chart podinfo/podinfo --version 6.15.0
+apiVersion: v1
+appVersion: 6.15.0
+description: Podinfo Helm chart for Kubernetes
+home: https://github.com/stefanprodan/podinfo
+kubeVersion: '>=1.23.0-0'
+maintainers:
+- email: stefanprodan@users.noreply.github.com
+  name: stefanprodan
+name: podinfo
+sources:
+- https://github.com/stefanprodan/podinfo
+version: 6.15.0
+
+
+$ helm show values podinfo/podinfo --version 6.15.0 | head -20
+# Default values for podinfo.
+
+replicaCount: 1
+logLevel: info
+host: #0.0.0.0
+backend: #http://backend-podinfo:9898/echo
+backends: []
+
+image:
+  repository: ghcr.io/stefanprodan/podinfo
+  tag: 6.15.0
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+prefix: /
+
+ui:
+  color: "#34577c"
+  message: ""
+  logo: ""
+
+$ helm install my-podinfo podinfo/podinfo --version 6.15.0 --namespace dso202-helm --create-namespace --set replicaCount=2 --set ui.message="Hello from DSO202" --wait --timeout 3m
+Error: INSTALLATION FAILED: resource Deployment/dso202-helm/my-podinfo not ready. status: InProgress, message: Available: 0/2
+context deadline exceeded
+
+$ helm list -n dso202-helm
+NAME      	NAMESPACE  	REVISION	UPDATED                             	STATUS	CHART         	APP VERSION
+my-podinfo	dso202-helm	1       	2026-11-08 15:40:49.460031 +0600 +06	failed	podinfo-6.15.0	6.15.0     
+
+$ helm list
+NAME	NAMESPACE	REVISION	UPDATED	STATUS	CHART	APP VERSION
+
+$ kubectl get deploy,svc,pods -n dso202-helm
+NAME                         READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/my-podinfo   0/2     2            0           3m26s
+
+NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)             AGE
+service/my-podinfo   ClusterIP   10.96.239.58   <none>        9898/TCP,9999/TCP   3m26s
+
+NAME                              READY   STATUS              RESTARTS   AGE
+pod/my-podinfo-5f9df7f848-btslw   0/1     ContainerCreating   0          3m26s
+pod/my-podinfo-5f9df7f848-r58td   0/1     ContainerCreating   0          3m26s

@@ -1,0 +1,31 @@
+# First attempt timed out (slow ghcr.io image pull on worker2); release uninstalled and re-run once images were cached.
+
+$ helm install my-podinfo podinfo/podinfo --version 6.15.0 --namespace dso202-helm --create-namespace --set replicaCount=2 --set ui.message="Hello from DSO202" --wait --timeout 3m
+NAME: my-podinfo
+LAST DEPLOYED: Sun Nov  8 15:56:30 2026
+NAMESPACE: dso202-helm
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+NOTES:
+1. Get the application URL by running these commands:
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl -n dso202-helm port-forward deploy/my-podinfo 8080:9898
+
+$ helm list -n dso202-helm
+NAME      	NAMESPACE  	REVISION	UPDATED                             	STATUS  	CHART         	APP VERSION
+my-podinfo	dso202-helm	1       	2026-11-08 15:56:30.806816 +0600 +06	deployed	podinfo-6.15.0	6.15.0     
+
+$ helm list
+NAME	NAMESPACE	REVISION	UPDATED	STATUS	CHART	APP VERSION
+
+$ kubectl get deploy,svc,pods -n dso202-helm
+NAME                         READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/my-podinfo   2/2     2            2           13s
+
+NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)             AGE
+service/my-podinfo   ClusterIP   10.96.73.167   <none>        9898/TCP,9999/TCP   13s
+
+NAME                              READY   STATUS    RESTARTS   AGE
+pod/my-podinfo-5f9df7f848-vcg5l   1/1     Running   0          13s
+pod/my-podinfo-5f9df7f848-xlknz   1/1     Running   0          13s

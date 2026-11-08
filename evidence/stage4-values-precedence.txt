@@ -1,0 +1,42 @@
+# Step 1: --set on top of a file
+
+$ helm template webapp-dev ./webapp -f environments/dev.yaml --set replicaCount=2 -s templates/deployment.yaml | grep 'replicas:'
+  replicas: 2
+
+# Step 2: layering dev then prod (prod wins, but dev's service leaks)
+
+$ helm template webapp-dev ./webapp -f environments/dev.yaml -f environments/prod.yaml -s templates/service.yaml | grep -E 'type:|nodePort:|environment'
+    dso202/environment: "prod"
+  type: NodePort
+      nodePort: 30080
+
+$ helm template webapp-dev ./webapp -f environments/dev.yaml -f environments/prod.yaml -s templates/deployment.yaml | grep -E 'replicas:|environment'
+    dso202/environment: "prod"
+  replicas: 3
+        dso202/environment: "prod"
+
+# layering prod then dev (prod's resources leak into dev)
+
+$ helm template webapp-dev ./webapp -f environments/prod.yaml -f environments/dev.yaml -s templates/deployment.yaml | grep -E 'replicas:|environment|cpu:'
+    dso202/environment: "dev"
+  replicas: 1
+        dso202/environment: "dev"
+              cpu: 500m
+              cpu: 100m
+
+# Step 3: --set type conversion vs --set-string
+
+$ helm template webapp-dev ./webapp -f environments/dev.yaml -s templates/deployment.yaml --set 'podAnnotations.prometheus\.io/scrape=true' | grep scrape
+        prometheus.io/scrape: true
+
+$ helm template webapp-dev ./webapp -f environments/dev.yaml -s templates/deployment.yaml --set-string 'podAnnotations.prometheus\.io/scrape=true' | grep scrape
+        prometheus.io/scrape: "true"
+
+# Step 4: delete a default with null
+
+$ helm template webapp-dev ./webapp -f environments/dev.yaml -s templates/deployment.yaml --set resources.limits=null | sed -n '/resources:/,/volumeMounts/p'
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+          volumeMounts:

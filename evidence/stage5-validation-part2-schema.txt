@@ -1,0 +1,21 @@
+# With values.schema.json in place
+
+$ helm template webapp-dev ./webapp -f environments/dev.yaml -f /tmp/tag-float.yaml
+Error: values don't meet the specifications of the schema(s) in the following chart(s):
+webapp:
+- at '/image/tag': got number, want string
+
+
+$ helm template webapp-dev ./webapp -f environments/dev.yaml --set replicaCount=two
+Error: values don't meet the specifications of the schema(s) in the following chart(s):
+webapp:
+- at '/replicaCount': got string, want integer
+
+
+$ helm template webapp-dev ./webapp -f environments/dev.yaml --set replicaCount=0 --set service.type=LoadBalancer --set page.environment=qa
+Error: values don't meet the specifications of the schema(s) in the following chart(s):
+webapp:
+- at '/page/environment': value must be one of '', 'dev', 'staging', 'prod'
+- at '/service/type': value must be one of 'ClusterIP', 'NodePort'
+- at '/replicaCount': minimum: got 0, want 1
+

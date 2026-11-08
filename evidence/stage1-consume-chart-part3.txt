@@ -1,0 +1,152 @@
+
+$ curl -s http://localhost:8080 | grep -E '"(version|message)"'
+  "version": "6.15.0",
+  "message": "Hello from DSO202",
+
+$ helm status my-podinfo -n dso202-helm | head -16
+NAME: my-podinfo
+LAST DEPLOYED: Sun Nov  8 15:56:30 2026
+NAMESPACE: dso202-helm
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+RESOURCES:
+==> v1/Service
+NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)             AGE
+my-podinfo   ClusterIP   10.96.73.167   <none>        9898/TCP,9999/TCP   120m
+
+==> v1/Deployment
+NAME         READY   UP-TO-DATE   AVAILABLE   AGE
+my-podinfo   2/2     2            2           120m
+
+==> v1/Pod(related)
+
+$ helm get values my-podinfo -n dso202-helm
+USER-SUPPLIED VALUES:
+replicaCount: 2
+ui:
+  message: Hello from DSO202
+
+$ helm get values my-podinfo -n dso202-helm --all | head -5
+COMPUTED VALUES:
+affinity: {}
+backends: []
+cache: ""
+certificate:
+
+$ helm get manifest my-podinfo -n dso202-helm | grep -E '^(# Source|kind:)'
+# Source: podinfo/templates/service.yaml
+kind: Service
+# Source: podinfo/templates/deployment.yaml
+kind: Deployment
+
+$ kubectl get secrets -n dso202-helm --show-labels
+NAME                               TYPE                 DATA   AGE    LABELS
+sh.helm.release.v1.my-podinfo.v1   helm.sh/release.v1   1      120m   modifiedAt=1794131803,name=my-podinfo,owner=helm,status=deployed,version=1
+
+$ kubectl get secret sh.helm.release.v1.my-podinfo.v1 -n dso202-helm -o jsonpath='{.data.release}' | base64 -d | base64 -d | gunzip | jq '{name, namespace, version, status: .info.status, apply_method, values: .config}'
+{
+  "name": "my-podinfo",
+  "namespace": "dso202-helm",
+  "version": 1,
+  "status": "deployed",
+  "apply_method": "ssa",
+  "values": {
+    "replicaCount": 2,
+    "ui": {
+      "message": "Hello from DSO202"
+    }
+  }
+}
+
+# ---- Step 9: upgrade with ONLY the new value (values-loss failure) ----
+
+$ helm upgrade my-podinfo podinfo/podinfo --version 6.15.0 -n dso202-helm --set ui.color='#2e7d32' | head -7
+Release "my-podinfo" has been upgraded. Happy Helming!
+NAME: my-podinfo
+LAST DEPLOYED: Sun Nov  8 17:58:01 2026
+NAMESPACE: dso202-helm
+STATUS: deployed
+REVISION: 2
+DESCRIPTION: Upgrade complete
+
+$ helm get values my-podinfo -n dso202-helm
+USER-SUPPLIED VALUES:
+ui:
+  color: '#2e7d32'
+
+$ kubectl get deploy my-podinfo -n dso202-helm -o jsonpath='{.spec.replicas}'; echo
+1
+
+# ---- Step 10: --reuse-values ----
+
+$ helm upgrade my-podinfo podinfo/podinfo --version 6.15.0 -n dso202-helm --reuse-values --set replicaCount=2 --set ui.message='Hello from DSO202' >/dev/null
+
+$ helm get values my-podinfo -n dso202-helm
+USER-SUPPLIED VALUES:
+replicaCount: 2
+ui:
+  color: '#2e7d32'
+  message: Hello from DSO202
+
+# ---- Step 11: rollback ----
+
+$ helm rollback my-podinfo 1 -n dso202-helm
+Rollback was a success! Happy Helming!
+
+$ helm history my-podinfo -n dso202-helm
+REVISION	UPDATED                 	STATUS    	CHART         	APP VERSION	DESCRIPTION     
+1       	Sun Nov  8 15:56:30 2026	superseded	podinfo-6.15.0	6.15.0     	Install complete
+2       	Sun Nov  8 17:58:01 2026	superseded	podinfo-6.15.0	6.15.0     	Upgrade complete
+3       	Sun Nov  8 17:58:01 2026	superseded	podinfo-6.15.0	6.15.0     	Upgrade complete
+4       	Sun Nov  8 18:13:10 2026	deployed  	podinfo-6.15.0	6.15.0     	Rollback to 1   
+
+$ helm get values my-podinfo -n dso202-helm
+USER-SUPPLIED VALUES:
+replicaCount: 2
+ui:
+  message: Hello from DSO202
+
+$ helm get values my-podinfo -n dso202-helm --revision 2
+USER-SUPPLIED VALUES:
+ui:
+  color: '#2e7d32'
+
+# ---- Step 12: uninstall ----
+
+$ helm uninstall my-podinfo -n dso202-helm --wait
+release "my-podinfo" uninstalled
+
+$ kubectl get all,secrets -n dso202-helm
+NAME                              READY   STATUS        RESTARTS   AGE
+pod/my-podinfo-5f9df7f848-5gzhx   0/1     Terminating   0          1s
+pod/my-podinfo-5f9df7f848-g6wxs   0/1     Terminating   0          1s
+pod/my-podinfo-5f9df7f848-vcg5l   1/1     Terminating   0          120m
+pod/my-podinfo-5f9df7f848-xlknz   1/1     Terminating   0          120m
+pod/my-podinfo-6cddcddb79-kbf7x   0/1     Terminating   0          2s
+pod/my-podinfo-6cddcddb79-lc4n4   0/1     Terminating   0          2s
+pod/my-podinfo-6cf875746-kk8xn    0/1     Error         0          2s
+pod/my-podinfo-6cf875746-wrrcf    0/1     Terminating   0          2s
+
+$ kubectl get namespace dso202-helm
+NAME          STATUS   AGE
+dso202-helm   Active   135m
+
+# ---- OCI registry ----
+
+$ helm show values oci://ghcr.io/stefanprodan/charts/podinfo --version 6.15.0 | head -5
+Pulled: ghcr.io/stefanprodan/charts/podinfo:6.15.0
+Digest: sha256:ff3d3e14728f75476ed4d43c14f80d52d81d36bc16906843463d464c6146f0d8
+# Default values for podinfo.
+
+replicaCount: 1
+logLevel: info
+host: #0.0.0.0
+
+$ helm install my-podinfo oci://ghcr.io/stefanprodan/charts/podinfo --version 6.15.0 -n dso202-helm --set replicaCount=2 --wait --timeout 3m
+
+$ helm list -n dso202-helm
+NAME	NAMESPACE	REVISION	UPDATED	STATUS	CHART	APP VERSION
+
+$ helm uninstall my-podinfo -n dso202-helm --wait
+Error: uninstall: Release not loaded: my-podinfo: release: not found

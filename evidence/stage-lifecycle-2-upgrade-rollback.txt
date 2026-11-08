@@ -1,0 +1,82 @@
+
+$ kubectl get deploy webapp-prod -n dso202-prod -o jsonpath='{.spec.template.metadata.annotations.checksum/config}'; echo
+961a0842e7b5bf4358355f92aea32116f06298e1879ee321f8ce9f751947d8fd
+
+# Upgrade 1: change page content (all values files passed again, plus one override)
+
+$ helm upgrade --install webapp-prod ./webapp -f environments/prod.yaml --set page.message='Production - v2' -n dso202-prod --rollback-on-failure --timeout 3m | head -6
+Release "webapp-prod" has been upgraded. Happy Helming!
+NAME: webapp-prod
+LAST DEPLOYED: Sun Nov  8 22:14:47 2026
+NAMESPACE: dso202-prod
+STATUS: deployed
+REVISION: 2
+
+$ kubectl get deploy webapp-prod -n dso202-prod -o jsonpath='{.spec.template.metadata.annotations.checksum/config}'; echo
+cf84dd2d7a2cbd524f2e94d2dac60c446c199a9ae3b4e34e97c0c968344c1fd7
+
+$ kubectl rollout history deploy/webapp-prod -n dso202-prod
+deployment.apps/webapp-prod 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+
+$ kubectl -n dso202-prod run curl-check --rm -i --restart=Never --image=busybox:1.37 -- wget -qO- http://webapp-prod | grep '<p>'
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+    <p>Production - v2</p>
+    <p>Environment: prod</p>
+    <p>Release: webapp-prod in namespace dso202-prod</p>
+    <p>Chart: webapp-0.1.0, application version 1.30-alpine</p>
+warning: couldn't attach to pod/curl-check, falling back to streaming logs: unable to upgrade connection: container curl-check not found in pod curl-check_dso202-prod
+    <p>Production - v2</p>
+    <p>Environment: prod</p>
+    <p>Release: webapp-prod in namespace dso202-prod</p>
+    <p>Chart: webapp-0.1.0, application version 1.30-alpine</p>
+
+# Upgrade 2: broken image tag; --rollback-on-failure must restore revision 2
+
+$ helm upgrade --install webapp-prod ./webapp -f environments/prod.yaml --set page.message='Production - v2' --set image.tag=does-not-exist -n dso202-prod --rollback-on-failure --timeout 45s
+level=WARN msg="upgrade failed" name=webapp-prod error="resource Deployment/dso202-prod/webapp-prod not ready. status: InProgress, message: Updated: 1/3\ncontext deadline exceeded"
+Error: UPGRADE FAILED: release webapp-prod failed, and has been rolled back due to rollback-on-failure being set: resource Deployment/dso202-prod/webapp-prod not ready. status: InProgress, message: Updated: 1/3
+context deadline exceeded
+
+$ helm history webapp-prod -n dso202-prod
+REVISION	UPDATED                 	STATUS    	CHART       	APP VERSION	DESCRIPTION                                                                                                                   
+1       	Sun Nov  8 22:14:21 2026	superseded	webapp-0.1.0	1.30-alpine	Install complete                                                                                                              
+2       	Sun Nov  8 22:14:47 2026	superseded	webapp-0.1.0	1.30-alpine	Upgrade complete                                                                                                              
+3       	Sun Nov  8 22:14:52 2026	failed    	webapp-0.1.0	1.30-alpine	Upgrade "webapp-prod" failed: resource Deployment/dso202-prod/webapp-prod not ready. status: InProgress, message: Updated: ...
+4       	Sun Nov  8 22:18:33 2026	deployed  	webapp-0.1.0	1.30-alpine	Rollback to 2                                                                                                                 
+
+$ kubectl get deploy webapp-prod -n dso202-prod -o jsonpath='{.spec.template.spec.containers[0].image}'; echo
+nginx:1.30-alpine
+
+# Manual rollback to revision 1
+
+$ helm rollback webapp-prod 1 -n dso202-prod --wait
+Rollback was a success! Happy Helming!
+
+$ helm history webapp-prod -n dso202-prod
+REVISION	UPDATED                 	STATUS    	CHART       	APP VERSION	DESCRIPTION                                                                                                                   
+1       	Sun Nov  8 22:14:21 2026	superseded	webapp-0.1.0	1.30-alpine	Install complete                                                                                                              
+2       	Sun Nov  8 22:14:47 2026	superseded	webapp-0.1.0	1.30-alpine	Upgrade complete                                                                                                              
+3       	Sun Nov  8 22:14:52 2026	failed    	webapp-0.1.0	1.30-alpine	Upgrade "webapp-prod" failed: resource Deployment/dso202-prod/webapp-prod not ready. status: InProgress, message: Updated: ...
+4       	Sun Nov  8 22:18:33 2026	superseded	webapp-0.1.0	1.30-alpine	Rollback to 2                                                                                                                 
+5       	Sun Nov  8 22:18:33 2026	deployed  	webapp-0.1.0	1.30-alpine	Rollback to 1                                                                                                                 
+
+$ kubectl -n dso202-prod run curl-check --rm -i --restart=Never --image=busybox:1.37 -- wget -qO- http://webapp-prod | grep '<p>'
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+    <p>Production</p>
+    <p>Environment: prod</p>
+    <p>Release: webapp-prod in namespace dso202-prod</p>
+    <p>Chart: webapp-0.1.0, application version 1.30-alpine</p>
+warning: couldn't attach to pod/curl-check, falling back to streaming logs: unable to upgrade connection: container curl-check not found in pod curl-check_dso202-prod
+
+$ kubectl get pods -n dso202-prod
+NAME                           READY   STATUS      RESTARTS   AGE
+webapp-prod-5ff66c99c5-cjxsp   1/1     Running     0          5s
+webapp-prod-5ff66c99c5-q9t6f   1/1     Running     0          3s
+webapp-prod-5ff66c99c5-zmfgj   1/1     Running     0          4s
+webapp-prod-test-connection    0/1     Completed   0          77s

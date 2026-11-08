@@ -1,0 +1,95 @@
+
+$ helm upgrade --install webapp-dev ./webapp -f environments/dev.yaml -n dso202-dev --create-namespace --rollback-on-failure --timeout 3m
+Release "webapp-dev" does not exist. Installing it now.
+NAME: webapp-dev
+LAST DEPLOYED: Sun Nov  8 22:14:20 2026
+NAMESPACE: dso202-dev
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+NOTES:
+Release webapp-dev (revision 1) is running in namespace dso202-dev.
+Environment: dev, replicas: 1
+
+Open the page from the host:
+  curl http://localhost:30080
+
+$ helm upgrade --install webapp-prod ./webapp -f environments/prod.yaml -n dso202-prod --create-namespace --rollback-on-failure --timeout 3m
+Release "webapp-prod" does not exist. Installing it now.
+NAME: webapp-prod
+LAST DEPLOYED: Sun Nov  8 22:14:21 2026
+NAMESPACE: dso202-prod
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+NOTES:
+Release webapp-prod (revision 1) is running in namespace dso202-prod.
+Environment: prod, replicas: 3
+
+Forward a local port, then open the page:
+  kubectl -n dso202-prod port-forward svc/webapp-prod 8080:80
+  curl http://localhost:8080
+
+$ helm list -A
+NAME       	NAMESPACE  	REVISION	UPDATED                             	STATUS  	CHART       	APP VERSION
+webapp-dev 	dso202-dev 	1       	2026-11-08 22:14:20.000472 +0600 +06	deployed	webapp-0.1.0	1.30-alpine
+webapp-prod	dso202-prod	1       	2026-11-08 22:14:21.672988 +0600 +06	deployed	webapp-0.1.0	1.30-alpine
+
+$ kubectl get deploy,svc,pods -n dso202-dev
+NAME                         READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/webapp-dev   1/1     1            1           3s
+
+NAME                 TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+service/webapp-dev   NodePort   10.96.98.231   <none>        80:30080/TCP   3s
+
+NAME                              READY   STATUS    RESTARTS   AGE
+pod/webapp-dev-548b675d86-tgmsd   1/1     Running   0          3s
+
+$ kubectl get deploy,svc,pods -n dso202-prod
+NAME                          READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/webapp-prod   3/3     3            3           2s
+
+NAME                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+service/webapp-prod   ClusterIP   10.96.215.197   <none>        80/TCP    2s
+
+NAME                               READY   STATUS    RESTARTS   AGE
+pod/webapp-prod-5ff66c99c5-jxr88   1/1     Running   0          2s
+pod/webapp-prod-5ff66c99c5-r4csd   1/1     Running   0          2s
+pod/webapp-prod-5ff66c99c5-zr2h4   1/1     Running   0          2s
+
+$ curl -s http://localhost:30080
+<!DOCTYPE html>
+<html>
+  <head><title>DSO202 Helm Demo</title></head>
+  <body>
+    <h1>DSO202 Helm Demo</h1>
+    <p>Development build - not for customers</p>
+    <p>Environment: dev</p>
+    <p>Release: webapp-dev in namespace dso202-dev</p>
+    <p>Chart: webapp-0.1.0, application version 1.30-alpine</p>
+  </body>
+</html>
+
+$ helm test webapp-dev -n dso202-dev
+NAME: webapp-dev
+LAST DEPLOYED: Sun Nov  8 22:14:20 2026
+NAMESPACE: dso202-dev
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+TEST SUITE:     webapp-dev-test-connection
+Last Started:   Sun Nov  8 22:14:23 2026
+Last Completed: Sun Nov  8 22:14:26 2026
+Phase:          Succeeded
+
+$ helm test webapp-prod -n dso202-prod
+NAME: webapp-prod
+LAST DEPLOYED: Sun Nov  8 22:14:21 2026
+NAMESPACE: dso202-prod
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+TEST SUITE:     webapp-prod-test-connection
+Last Started:   Sun Nov  8 22:14:26 2026
+Last Completed: Sun Nov  8 22:14:28 2026
+Phase:          Succeeded

@@ -1,0 +1,61 @@
+# 6a - drift: someone scales the Deployment with kubectl
+
+$ kubectl scale deploy/webapp-prod -n dso202-prod --replicas=5
+deployment.apps/webapp-prod scaled
+
+$ kubectl get deploy webapp-prod -n dso202-prod -o json | jq -c '.metadata.managedFields[] | {manager, operation, subresource}'
+jq: error (at <stdin>:157): Cannot iterate over null (null)
+
+$ helm upgrade webapp-prod ./webapp -f environments/prod.yaml -n dso202-prod --wait --timeout 2m
+level=WARN msg="upgrade failed" name=webapp-prod error="conflict occurred while applying object dso202-prod/webapp-prod apps/v1, Kind=Deployment: Apply failed with 1 conflict: conflict with \"kubectl\" with subresource \"scale\" using apps/v1: .spec.replicas"
+Error: UPGRADE FAILED: conflict occurred while applying object dso202-prod/webapp-prod apps/v1, Kind=Deployment: Apply failed with 1 conflict: conflict with "kubectl" with subresource "scale" using apps/v1: .spec.replicas
+
+$ helm upgrade webapp-prod ./webapp -f environments/prod.yaml -n dso202-prod --force-conflicts --wait --timeout 2m | head -6
+Release "webapp-prod" has been upgraded. Happy Helming!
+NAME: webapp-prod
+LAST DEPLOYED: Sun Nov  8 22:18:55 2026
+NAMESPACE: dso202-prod
+STATUS: deployed
+REVISION: 7
+
+$ kubectl get deploy webapp-prod -n dso202-prod -o jsonpath='{.spec.replicas}'; echo
+3
+
+# 6b - Helm refuses to adopt an object it did not create
+
+$ kubectl create namespace dso202-staging
+namespace/dso202-staging created
+
+$ kubectl create configmap webapp-staging -n dso202-staging --from-literal=owner=someone-else
+configmap/webapp-staging created
+
+$ helm install webapp-staging ./webapp --set page.environment=staging -n dso202-staging
+Error: INSTALLATION FAILED: unable to continue with install: ConfigMap "webapp-staging" in namespace "dso202-staging" exists and cannot be imported into the current release: invalid ownership metadata; label validation error: missing key "app.kubernetes.io/managed-by": must be set to "Helm"; annotation validation error: missing key "meta.helm.sh/release-name": must be set to "webapp-staging"; annotation validation error: missing key "meta.helm.sh/release-namespace": must be set to "dso202-staging"
+
+$ helm install webapp-staging ./webapp --set page.environment=staging -n dso202-staging --take-ownership --wait --timeout 2m | head -6
+NAME: webapp-staging
+LAST DEPLOYED: Sun Nov  8 22:18:56 2026
+NAMESPACE: dso202-staging
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+
+$ kubectl get configmap webapp-staging -n dso202-staging -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by} {.metadata.annotations.meta\.helm\.sh/release-name}'; echo
+Helm webapp-staging
+
+# 6c - two Services cannot hold the same NodePort
+
+$ helm upgrade webapp-staging ./webapp --set page.environment=staging --set service.type=NodePort --set service.nodePort=30080 -n dso202-staging
+level=WARN msg="upgrade failed" name=webapp-staging error="server-side apply failed for object dso202-staging/webapp-staging /v1, Kind=Service: Service \"webapp-staging\" is invalid: spec.ports[0].nodePort: Invalid value: 30080: provided port is already allocated"
+Error: UPGRADE FAILED: server-side apply failed for object dso202-staging/webapp-staging /v1, Kind=Service: Service "webapp-staging" is invalid: spec.ports[0].nodePort: Invalid value: 30080: provided port is already allocated
+
+$ helm history webapp-staging -n dso202-staging
+REVISION	UPDATED                 	STATUS  	CHART       	APP VERSION	DESCRIPTION                                                                                                                                                                                                                                
+1       	Sun Nov  8 22:18:56 2026	deployed	webapp-0.1.0	1.30-alpine	Install complete                                                                                                                                                                                                                           
+2       	Sun Nov  8 22:18:57 2026	failed  	webapp-0.1.0	1.30-alpine	Upgrade "webapp-staging" failed: server-side apply failed for object dso202-staging/webapp-staging /v1, Kind=Service: Service "webapp-staging" is invalid: spec.ports[0].nodePort: Invalid value: 30080: provided port is already allocated
+
+$ helm uninstall webapp-staging -n dso202-staging --wait
+release "webapp-staging" uninstalled
+
+$ kubectl delete namespace dso202-staging
+namespace "dso202-staging" deleted

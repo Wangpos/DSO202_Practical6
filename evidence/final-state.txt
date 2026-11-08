@@ -1,0 +1,52 @@
+
+$ helm lint ./dso202-helm-lab/webapp -f dso202-helm-lab/environments/prod.yaml | tail -1
+1 chart(s) linted, 0 chart(s) failed
+
+$ helm package ./dso202-helm-lab/webapp -d ./dso202-helm-lab/dist
+Successfully packaged chart and saved it to: dso202-helm-lab/dist/webapp-0.1.0.tgz
+
+$ tar -tzf dso202-helm-lab/dist/webapp-0.1.0.tgz
+webapp/Chart.yaml
+webapp/values.yaml
+webapp/values.schema.json
+webapp/templates/NOTES.txt
+webapp/templates/_helpers.tpl
+webapp/templates/configmap.yaml
+webapp/templates/deployment.yaml
+webapp/templates/service.yaml
+webapp/templates/tests/test-connection.yaml
+webapp/.helmignore
+
+$ helm list -A
+NAME       	NAMESPACE  	REVISION	UPDATED                             	STATUS  	CHART       	APP VERSION
+webapp-dev 	dso202-dev 	1       	2026-11-08 22:14:20.000472 +0600 +06	deployed	webapp-0.1.0	1.30-alpine
+webapp-prod	dso202-prod	7       	2026-11-08 22:18:55.768937 +0600 +06	deployed	webapp-0.1.0	1.30-alpine
+
+$ helm history webapp-dev -n dso202-dev
+REVISION	UPDATED                 	STATUS  	CHART       	APP VERSION	DESCRIPTION     
+1       	Sun Nov  8 22:14:20 2026	deployed	webapp-0.1.0	1.30-alpine	Install complete
+
+$ helm history webapp-prod -n dso202-prod
+REVISION	UPDATED                 	STATUS    	CHART       	APP VERSION	DESCRIPTION                                                                                                                                                                                                                         
+1       	Sun Nov  8 22:14:21 2026	superseded	webapp-0.1.0	1.30-alpine	Install complete                                                                                                                                                                                                                    
+2       	Sun Nov  8 22:14:47 2026	superseded	webapp-0.1.0	1.30-alpine	Upgrade complete                                                                                                                                                                                                                    
+3       	Sun Nov  8 22:14:52 2026	failed    	webapp-0.1.0	1.30-alpine	Upgrade "webapp-prod" failed: resource Deployment/dso202-prod/webapp-prod not ready. status: InProgress, message: Updated: 1/3                                                                                                      
+        	                        	          	            	           	context deadline exceeded                                                                                                                                                                                                           
+4       	Sun Nov  8 22:18:33 2026	superseded	webapp-0.1.0	1.30-alpine	Rollback to 2                                                                                                                                                                                                                       
+5       	Sun Nov  8 22:18:33 2026	superseded	webapp-0.1.0	1.30-alpine	Rollback to 1                                                                                                                                                                                                                       
+6       	Sun Nov  8 22:18:55 2026	failed    	webapp-0.1.0	1.30-alpine	Upgrade "webapp-prod" failed: conflict occurred while applying object dso202-prod/webapp-prod apps/v1, Kind=Deployment: Apply failed with 1 conflict: conflict with "kubectl" with subresource "scale" using apps/v1: .spec.replicas
+7       	Sun Nov  8 22:18:55 2026	deployed  	webapp-0.1.0	1.30-alpine	Upgrade complete                                                                                                                                                                                                                    
+
+$ kubectl get deploy,svc -n dso202-dev
+NAME                         READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/webapp-dev   1/1     1            1           4m50s
+
+NAME                 TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+service/webapp-dev   NodePort   10.96.98.231   <none>        80:30080/TCP   4m50s
+
+$ kubectl get deploy,svc -n dso202-prod
+NAME                          READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/webapp-prod   3/3     3            3           4m49s
+
+NAME                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+service/webapp-prod   ClusterIP   10.96.215.197   <none>        80/TCP    4m49s

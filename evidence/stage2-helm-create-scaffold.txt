@@ -1,0 +1,12 @@
+scaffold/.helmignore
+scaffold/Chart.yaml
+scaffold/templates/_helpers.tpl
+scaffold/templates/deployment.yaml
+scaffold/templates/hpa.yaml
+scaffold/templates/httproute.yaml
+scaffold/templates/ingress.yaml
+scaffold/templates/NOTES.txt
+scaffold/templates/service.yaml
+scaffold/templates/serviceaccount.yaml
+scaffold/templates/tests/test-connection.yaml
+scaffold/values.yaml
